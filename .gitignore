@@ -72,3 +72,7 @@ package-lock.json
 
 # Planning (local scratchpad)
 plan/
+
+# devenv / direnv (local dev environment)
+.direnv/
+.devenv/
