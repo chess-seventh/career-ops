@@ -4725,6 +4725,53 @@ if (!updateSys.includes("'modes/apply.md'") && !updateSys.includes("'modes/conta
   fail("update-system.mjs SYSTEM_PATHS still lists apply.md or contacto.md — re-introduction vector open");
 }
 
+// ── N2. CROSS-REFERENCE STRIP ───────────────────────────────────
+// @boundary: verifies apply/contacto references stripped from shared docs.
+
+console.log('\nN2. Cross-reference strip');
+
+// N2-a: auto-pipeline.md must not contain "Draft Application Answers" step
+const autoPipeline = readFile('modes/auto-pipeline.md');
+if (!autoPipeline.includes('Draft Application Answers')) {
+  pass('auto-pipeline.md has no Draft Application Answers step');
+} else {
+  fail('auto-pipeline.md still contains Draft Application Answers — violates brief constraint 2');
+}
+
+// N2-b: followup.md must not reference /career-ops contacto
+const followupMode = readFile('modes/followup.md');
+if (!followupMode.includes('/career-ops contacto') && !followupMode.includes('contacto framework')) {
+  pass('followup.md has no /career-ops contacto references');
+} else {
+  fail('followup.md still references /career-ops contacto or contacto framework');
+}
+
+// N2-c: CLAUDE.md must not contain apply/contacto command table rows
+const claudeMd = readFile('CLAUDE.md');
+if (
+  !claudeMd.includes('| `/career-ops-contact`') &&
+  !claudeMd.includes('| `/career-ops-apply`') &&
+  !claudeMd.includes('| Wants LinkedIn outreach') &&
+  !claudeMd.includes('| Fills out application form')
+) {
+  pass('CLAUDE.md has no apply/contacto command table rows');
+} else {
+  fail('CLAUDE.md still has apply/contacto command table rows');
+}
+
+// N2-d: AGENTS.md must not contain apply/contacto command table rows
+const agentsMd = readFile('AGENTS.md');
+if (
+  !agentsMd.includes('| `/career-ops-contact`') &&
+  !agentsMd.includes('| `/career-ops-apply`') &&
+  !agentsMd.includes('| Wants LinkedIn outreach') &&
+  !agentsMd.includes('| Fills out application form')
+) {
+  pass('AGENTS.md has no apply/contacto command table rows');
+} else {
+  fail('AGENTS.md still has apply/contacto command table rows');
+}
+
 // ── SUMMARY ─────────────────────────────────────────────────────
 
 console.log('\n' + '='.repeat(50));

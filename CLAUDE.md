@@ -93,7 +93,6 @@ You can invoke the command center or any of its modes directly within your CLI:
 * `cover` — Generate cover letter
 * `interview-prep` — Generate interview preparation guide
 * `interview` — Onboarding/on-demand interview
-* `contacto` — Generate LinkedIn outreach message
 * `deep` — Execute deep company research
 * `training` — Evaluate course/cert against North Star
 * `project` — Evaluate portfolio project idea
@@ -224,7 +223,6 @@ Default modes are in `modes/` (English). Language-specific modes live in `modes/
 | Pastes JD or URL | auto-pipeline (evaluate + report + PDF + tracker) |
 | Asks to evaluate offer | `oferta` |
 | Asks to compare offers | `ofertas` |
-| Wants LinkedIn outreach | `contacto` |
 | Asks for company research | `deep` |
 | Preps for interview at specific company | `interview-prep` |
 | Wants interactive profile/CV onboarding | `interview` |
@@ -232,7 +230,6 @@ Default modes are in `modes/` (English). Language-specific modes live in `modes/
 | Evaluates a course/cert | `training` |
 | Evaluates portfolio project | `project` |
 | Asks about application status | `tracker` |
-| Fills out application form | `apply` |
 | Searches for new offers | `scan` |
 | Processes pending URLs | `pipeline` |
 | Batch processes offers | `batch` |

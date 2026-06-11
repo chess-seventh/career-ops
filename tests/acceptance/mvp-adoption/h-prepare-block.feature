@@ -16,7 +16,7 @@ Feature: H) Prepare block in evaluation reports (slice-03)
 
   @walking_skeleton @driving_port @real-io @US-3 @requires_external
   Scenario: Evaluation report always includes H) Prepare block
-    # Driving port: /career-ops oferta — Claude Code skill (manual smoke)
+    # Driving port: /career-ops oferta — GEMINI_API_KEY required (manual smoke, @requires_external)
     # This is the end-to-end proof. Verified by the maintainer post-delivery.
     Given a job description URL for a software role at any company
     And the career-ops evaluation mode is active (oferta or auto-pipeline)
