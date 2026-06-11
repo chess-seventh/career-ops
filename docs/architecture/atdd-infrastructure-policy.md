@@ -25,5 +25,5 @@ write-if-absent; rewrite with `--policy=fresh`. Git history is the audit trail.
 
 | Port | Fake | Note |
 |------|------|------|
-| Claude API (evaluation) | `@requires_external` — no fake | H) Prepare block scenarios require real Claude evaluation; skip in CI unless external available |
+| GEMINI API (GEMINI_API_KEY) | `@requires_external` — no fake | H) Prepare block scenarios require real GEMINI evaluation; skip in CI unless GEMINI_API_KEY available |
 | rusty_cv_creator binary | Manual smoke test | `@requires_external` — user copies command from H block and runs it |
