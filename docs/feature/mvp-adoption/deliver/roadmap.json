@@ -1,0 +1,90 @@
+{
+  "feature_id": "mvp-adoption",
+  "feature_name": "MVP strip: remove apply/contacto, add H) Prepare",
+  "branch": "feat/mvp-strip-apply-contacto",
+  "tdd_phases": ["RED", "GREEN", "COMMIT"],
+  "paradigm": "oop",
+  "crafter": "direct",
+  "deliver_order": ["04", "01", "02", "03"],
+  "validation": { "status": "approved", "source": "DISTILL wave + user constraints" },
+  "steps": [
+    {
+      "id": "04",
+      "name": "Wire NO APPLY/CONTACTO keystone gate in test-all.mjs",
+      "tdd": "RED commit — gate added before forbidden files are deleted",
+      "scenarios": [
+        "no-apply-contacto-gate.feature: Keystone gate reports PASS on clean post-removal state",
+        "no-apply-contacto-gate.feature: Gate goes RED when modes/apply.md still exists",
+        "no-apply-contacto-gate.feature: Gate goes RED when modes/contacto.md still exists",
+        "no-apply-contacto-gate.feature: Gate goes RED when update-system.mjs SYSTEM_PATHS re-introduction vector is open",
+        "no-apply-contacto-gate.feature: Gate goes RED when SKILL.md still routes to apply or contacto"
+      ],
+      "files_to_modify": ["test-all.mjs"],
+      "expected_exit_code_after": 1,
+      "note": "Intentional RED commit — forbidden files still present"
+    },
+    {
+      "id": "01",
+      "name": "Delete 9 apply/contacto mode files, remove from section 8 expectedModes",
+      "tdd": "GREEN for N1-a (file absence assertions)",
+      "scenarios": [
+        "cross-reference-strip.feature: All 9 apply/contacto mode files are absent"
+      ],
+      "files_to_modify": [
+        "test-all.mjs (remove apply.md, contacto.md from expectedModes)",
+        "modes/apply.md (DELETE)",
+        "modes/contacto.md (DELETE)",
+        "modes/de/bewerben.md (DELETE)",
+        "modes/fr/postuler.md (DELETE)",
+        "modes/pt/aplicar.md (DELETE if exists)",
+        "modes/ru/apply.md (DELETE if exists)",
+        "modes/ua/apply.md (DELETE if exists)",
+        "modes/ja/oubo.md (DELETE)",
+        "modes/tr/basvuru.md (DELETE)"
+      ],
+      "expected_exit_code_after": 1,
+      "note": "N1-a GREEN; N1-b + N1-c still RED (SKILL.md + SYSTEM_PATHS unchanged)"
+    },
+    {
+      "id": "02",
+      "name": "Strip apply/contacto cross-references + patch SYSTEM_PATHS and SKILL.md",
+      "tdd": "GREEN for N1-b, N1-c, and @boundary cross-reference scenarios",
+      "scenarios": [
+        "no-apply-contacto-gate.feature: Keystone gate reports PASS on clean post-removal state",
+        "cross-reference-strip.feature: No /career-ops apply or contacto references remain in active files",
+        "cross-reference-strip.feature: auto-pipeline.md has no Step 4 Draft Application Answers",
+        "cross-reference-strip.feature: followup.md has no contacto references",
+        "cross-reference-strip.feature: CLAUDE.md and AGENTS.md apply/contacto rows are removed"
+      ],
+      "files_to_modify": [
+        ".agents/skills/career-ops/SKILL.md",
+        "update-system.mjs",
+        "CLAUDE.md",
+        "AGENTS.md",
+        "modes/auto-pipeline.md",
+        "modes/followup.md",
+        "docs/architecture/atdd-infrastructure-policy.md (GEMINI provider label fix)"
+      ],
+      "expected_exit_code_after": 1,
+      "note": "N1-b + N1-c GREEN; 2 pre-existing failures remain (js-yaml + analyze-patterns)"
+    },
+    {
+      "id": "03",
+      "name": "Add H) Prepare block to oferta.md + H) Prepare report check to test-all.mjs",
+      "tdd": "GREEN for H) Prepare template scenarios",
+      "scenarios": [
+        "h-prepare-block.feature: oferta.md template contains the H) Prepare block spec",
+        "h-prepare-block.feature: H) Prepare block in oferta.md carries manual-invocation label",
+        "h-prepare-block.feature: H) Prepare block in oferta.md documents B-CV-01 quote injection gap",
+        "h-prepare-block.feature: oferta.md H) Prepare section has no score-gate condition",
+        "h-prepare-block.feature: test-all.mjs checks H) Prepare presence in all existing reports"
+      ],
+      "files_to_modify": [
+        "modes/oferta.md (replace ## H) Draft Application Answers with ## H) Prepare spec)",
+        "test-all.mjs (add N2 H) Prepare report check section)"
+      ],
+      "expected_exit_code_after": 1,
+      "note": "H) Prepare assertions GREEN; 2 pre-existing failures remain"
+    }
+  ]
+}
