@@ -4002,6 +4002,82 @@ if (!updateSys.includes("'modes/apply.md'") && !updateSys.includes("'modes/conta
   fail("update-system.mjs SYSTEM_PATHS still lists apply.md or contacto.md — re-introduction vector open");
 }
 
+// ── N3. H) PREPARE BLOCK ────────────────────────────────────────
+// Verifies oferta.md template contains the H) Prepare spec (story 3).
+// Also checks any existing reports in reports/ for presence of ## H) Prepare.
+
+console.log('\nN3. H) Prepare block');
+
+// N3-a: oferta.md template contains the H) Prepare spec
+const ofertaMd = readFile('modes/oferta.md');
+if (
+  ofertaMd.includes('## H) Prepare') &&
+  ofertaMd.includes('rusty_cv_creator insert') &&
+  ofertaMd.includes('--job-title') &&
+  ofertaMd.includes('--company-name') &&
+  ofertaMd.includes('--quote')
+) {
+  pass('oferta.md H) Prepare block contains rusty_cv_creator insert command');
+} else {
+  fail('oferta.md H) Prepare block is missing or incomplete');
+}
+
+// N3-b: manual-invocation label
+if (
+  ofertaMd.includes('Copy-paste to generate your CV') &&
+  ofertaMd.includes('Invocation is manual') &&
+  ofertaMd.includes('career-ops does not')
+) {
+  pass('oferta.md H) Prepare carries manual-invocation label (D-22)');
+} else {
+  fail('oferta.md H) Prepare missing manual-invocation label');
+}
+
+// N3-c: B-CV-01 gap documented
+if (ofertaMd.includes('_change_quote_in_destination_cv')) {
+  pass('oferta.md H) Prepare documents B-CV-01 quote injection gap');
+} else {
+  fail('oferta.md H) Prepare missing B-CV-01 _change_quote_in_destination_cv note');
+}
+
+// N3-d: no score-gate condition on H section (D-13: block generated unconditionally)
+const hIdx = ofertaMd.indexOf('## H) Prepare');
+const hSection = hIdx >= 0 ? ofertaMd.slice(hIdx, hIdx + 400) : '';
+if (
+  !hSection.includes('if score') &&
+  !hSection.includes('score >=') &&
+  !hSection.includes('score >= 4') &&
+  !hSection.includes('only if score')
+) {
+  pass('oferta.md H) Prepare has no score-gate condition (D-13)');
+} else {
+  fail('oferta.md H) Prepare has a score-gate condition — violates D-13');
+}
+
+// N3-e: existing reports must contain ## H) Prepare (warn if none found)
+try {
+  const reportsDir = join(ROOT, 'reports');
+  if (!existsSync(reportsDir)) {
+    warn('No reports/ directory — skipping H) Prepare report check');
+  } else {
+    const reports = readdirSync(reportsDir).filter(f => f.endsWith('.md'));
+    if (reports.length === 0) {
+      warn('No report files in reports/ — skipping H) Prepare report check');
+    } else {
+      for (const report of reports) {
+        const content = readFileSync(join(reportsDir, report), 'utf-8');
+        if (content.includes('## H) Prepare')) {
+          pass(`H) Prepare block present: ${report}`);
+        } else {
+          fail(`H) Prepare block MISSING in: ${report}`);
+        }
+      }
+    }
+  }
+} catch (e) {
+  fail(`H) Prepare report check crashed: ${e.message}`);
+}
+
 // ── N2. CROSS-REFERENCE STRIP ───────────────────────────────────
 // @boundary: verifies apply/contacto references stripped from shared docs.
 
