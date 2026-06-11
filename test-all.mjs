@@ -3962,6 +3962,46 @@ try {
   fail(`ibm provider tests crashed: ${e.message}`);
 }
 
+// ── N1. NO APPLY/CONTACTO GATE ──────────────────────────────────
+// Keystone: verifies apply/contacto have been fully removed (slices 01-02).
+// RED on a clean checkout (files still present); GREEN after both slices.
+
+console.log('\nN1. No-apply/contacto gate');
+
+// N1-a: 9 forbidden mode files must be absent
+const forbiddenModes = [
+  'modes/apply.md', 'modes/contacto.md', 'modes/de/bewerben.md',
+  'modes/fr/postuler.md', 'modes/pt/aplicar.md', 'modes/ru/apply.md',
+  'modes/ua/apply.md', 'modes/ja/oubo.md', 'modes/tr/basvuru.md',
+];
+for (const mode of forbiddenModes) {
+  if (!fileExists(mode)) {
+    pass(`Absent (required): ${mode}`);
+  } else {
+    fail(`FORBIDDEN mode still exists: ${mode}`);
+  }
+}
+
+// N1-b: SKILL.md routing table rows must not reference apply or contacto
+// Scope: pipe-delimited table rows only (| `apply` | ... | `apply` |)
+// Broader /career-ops apply command references are checked by grep (Story 2 AC1)
+const skill = readFile('.agents/skills/career-ops/SKILL.md');
+if (!skill.includes('| `contacto`') && !skill.includes('| `apply`')) {
+  pass('SKILL.md has no apply/contacto routing rows');
+} else {
+  fail('SKILL.md still routes to apply or contacto');
+}
+
+// N1-c: update-system.mjs SYSTEM_PATHS must not list apply/contacto
+// Re-introduction vector: an upstream update would restore the deleted files
+// if the entries remain in SYSTEM_PATHS (the file is also in its own SYSTEM_PATHS)
+const updateSys = readFile('update-system.mjs');
+if (!updateSys.includes("'modes/apply.md'") && !updateSys.includes("'modes/contacto.md'")) {
+  pass('update-system.mjs SYSTEM_PATHS has no apply/contacto entries');
+} else {
+  fail("update-system.mjs SYSTEM_PATHS still lists apply.md or contacto.md — re-introduction vector open");
+}
+
 // ── SUMMARY ─────────────────────────────────────────────────────
 
 console.log('\n' + '='.repeat(50));
