@@ -1,0 +1,45 @@
+journey:
+  name: find-score-prepare
+  description: "Solo operator discovers, evaluates, and prepares a CV for a target role — manually, without any outbound action"
+  persona: franci-solo-operator
+  job_ids:
+    - JOB-001
+
+  steps:
+    - id: find
+      label: "Find"
+      action: "node scan.mjs"
+      artifact_out: "data/pipeline.md (new URLs appended)"
+      emotional_state: "curious, controlled"
+
+    - id: score
+      label: "Score"
+      action: "/career-ops oferta {url}"
+      artifact_out: "reports/{###}-{slug}-{date}.md (A-G + H blocks)"
+      emotional_state: "analytical, decisive"
+
+    - id: prepare
+      label: "Prepare"
+      action: "rusty_cv_creator insert --job-title ... --company-name ... --quote ..."
+      artifact_in: "## H) Prepare block from report"
+      artifact_out: "PDF at [destination].cv_path/<company>-<title>.pdf"
+      emotional_state: "confident, ready"
+
+  shared_artifacts:
+    - name: pipeline.md
+      source: scan.mjs
+      consumed_by: [score]
+    - name: evaluation report (## H) Prepare)
+      source: /career-ops oferta
+      consumed_by: [rusty_cv_creator insert]
+
+  error_paths:
+    - step: find
+      failure: "Provider returns no results"
+      recovery: "Check portals.yml config; run node scan.mjs --company <name> for targeted scan"
+    - step: score
+      failure: "JD URL no longer active"
+      recovery: "Mark as Discarded in tracker; remove from pipeline.md"
+    - step: prepare
+      failure: "rusty_cv_creator INI misconfigured"
+      recovery: "Check ~/.config/rusty-cv-creator/rusty-cv-config.ini; verify cv_template_path exists"

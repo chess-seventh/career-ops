@@ -1,0 +1,22 @@
+jobs:
+  - id: JOB-001
+    title: "Strip outbound action; wire find/score/prepare"
+    job_story: >
+      When I maintain a private career-ops fork,
+      I want provable removal of all apply/contacto capability and a clean integration with rusty_cv_creator,
+      so I can trust the tool finds and scores roles without ever acting outbound on my behalf.
+    dimensions:
+      functional: "Delete apply/contacto modes; add rusty_cv_creator handoff block to evaluation reports"
+      emotional: "Confidence that the tool cannot accidentally submit anything or contact anyone"
+      social: "An auditable, constraint-enforced fork I can share without risk"
+    four_forces:
+      push: "Risk of accidental outbound action if upstream modes exist or are reintroduced via merge"
+      pull: "A provably safe, mechanically verified codebase with a clean CI gate"
+      anxiety: "Removal might break shared evaluation/scan/PDF surfaces"
+      habit: "Existing scan → score → prepare flow must be preserved end-to-end"
+    opportunity_score:
+      importance: 5
+      satisfaction: 1
+      score: 4  # importance - satisfaction gap
+    features:
+      - mvp-adoption
