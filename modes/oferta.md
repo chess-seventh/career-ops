@@ -259,8 +259,16 @@ Save full evaluation in `reports/{###}-{company-slug}-{YYYY-MM-DD}.md`.
 ## G) Posting Legitimacy
 (full content of block G)
 
-## H) Draft Application Answers
-(only if score >= 4.5 — draft answers for the application form)
+## H) Prepare
+> **Copy-paste to generate your CV.** Invocation is manual — career-ops does not call
+> rusty_cv_creator automatically (D-22). Review the report score before proceeding.
+> ⚠️ `--quote` is accepted by the CLI but quote injection is currently inactive in
+> rusty_cv_creator (`_change_quote_in_destination_cv` is dead code — B-CV-01).
+
+    rusty_cv_creator insert \
+      --job-title "{extracted job title from Block A}" \
+      --company-name "{company name from Block A}" \
+      --quote "{one sentence ≤120 chars drawn from your proof points, tailored to this role}"
 
 ---
 
