@@ -44,6 +44,12 @@ try {
 }
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  validateEvaluationShape,
+  classifyGeminiError,
+  assertHealthyGeneration,
+  DegradedEvaluationError,
+} from './gemini-eval-core.mjs';
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -163,47 +169,6 @@ function nextReportNumber() {
   return String(Math.max(...files) + 1).padStart(3, '0');
 }
 
-function validateEvaluationShape(text) {
-  const issues = [];
-  const requiredBlocks = [
-    ['A', /(?:^|\n)#{1,3}\s*(?:A[).:-]?|Block A\b)/im],
-    ['B', /(?:^|\n)#{1,3}\s*(?:B[).:-]?|Block B\b)/im],
-    ['C', /(?:^|\n)#{1,3}\s*(?:C[).:-]?|Block C\b)/im],
-    ['D', /(?:^|\n)#{1,3}\s*(?:D[).:-]?|Block D\b)/im],
-    ['E', /(?:^|\n)#{1,3}\s*(?:E[).:-]?|Block E\b)/im],
-    ['F', /(?:^|\n)#{1,3}\s*(?:F[).:-]?|Block F\b)/im],
-    ['G', /(?:^|\n)#{1,3}\s*(?:G[).:-]?|Block G\b)/im],
-  ];
-
-  for (const [label, pattern] of requiredBlocks) {
-    if (!pattern.test(text)) issues.push(`missing Block ${label}`);
-  }
-
-  const summary = text.match(/---SCORE_SUMMARY---\s*([\s\S]*?)---END_SUMMARY---/);
-  if (!summary) {
-    issues.push('missing SCORE_SUMMARY block');
-  } else {
-    const summaryBlock = summary[1];
-    for (const key of ['COMPANY', 'ROLE', 'ARCHETYPE', 'LEGITIMACY']) {
-      const field = summaryBlock.match(new RegExp(`^\\s*${key}:\\s*(.+)$`, 'mi'));
-      const value = field?.[1]?.trim() ?? '';
-      if (!value || (key !== 'COMPANY' && value.toLowerCase() === 'unknown')) {
-        issues.push(`SCORE_SUMMARY ${key} is required`);
-      }
-    }
-
-    const score = summaryBlock.match(/^\s*SCORE:\s*([0-9]+(?:\.[0-9]+)?)/mi);
-    const scoreValue = score ? Number(score[1]) : NaN;
-    if (!Number.isFinite(scoreValue) || scoreValue < 0 || scoreValue > 5) {
-      issues.push('SCORE_SUMMARY score must be a number between 0 and 5');
-    }
-  }
-
-  if (issues.length > 0) {
-    throw new Error(`Gemini returned an invalid career-ops report: ${issues.join('; ')}`);
-  }
-}
-
 function slugifyCompany(value) {
   return String(value || '')
     .toLowerCase()
@@ -282,7 +247,22 @@ IMPORTANT OPERATING RULES FOR THIS CLI SESSION
    - For Block D (Comp research): provide salary estimates based on your training data, clearly noted as estimates.
    - For Block G (Legitimacy): analyze the JD text only; skip URL/page freshness checks.
    - Post-evaluation file saving is handled by the script, not by you.
-2. Generate Blocks A through G in full, in English, unless the JD is in another language.
+2. Generate Blocks A through H in full, in English, unless the JD is in another language.
+   - Blocks A-G are the evaluation (A) Role Summary, B) Match with CV, C) Level and
+     Strategy, D) Comp and Demand, E) Customization Plan, F) Interview Plan,
+     G) Posting Legitimacy).
+   - Block H is "## H) Prepare": a copy-paste rusty_cv_creator invocation. Emit it
+     verbatim, filling {job title} and {company} from Block A:
+
+         ## H) Prepare
+
+             rusty_cv_creator insert \\
+               --job-title "{job title from Block A}" \\
+               --company-name "{company from Block A}" \\
+               --quote "{one sentence <=120 chars from the candidate proof points}"
+
+   You MUST output all of A through H. A response missing any block (especially H)
+   is treated as degraded and rejected — do not truncate.
 3. At the very end, output a machine-readable summary block in this exact format:
 
 ---SCORE_SUMMARY---
@@ -304,7 +284,7 @@ const model = genAI.getGenerativeModel({
   model: modelName,
   generationConfig: {
     temperature: 0.4,      // deterministic enough for structured evaluation
-    maxOutputTokens: 16384, // full 7-block evaluation
+    maxOutputTokens: 16384, // full A-H evaluation
   },
 });
 
@@ -314,14 +294,33 @@ try {
     { text: systemPrompt },
     { text: `\n\nJOB DESCRIPTION TO EVALUATE:\n\n${jdText}` },
   ]);
-  evaluationText = result.response.text();
+
+  // F-01 guard: fail loud BEFORE reading text if the generation was truncated
+  // or served by a downgraded model. response.modelVersion is best-effort (the
+  // API may omit it); finishReason is the reliable truncation signal.
+  const response = result.response;
+  assertHealthyGeneration({
+    finishReason: response?.candidates?.[0]?.finishReason,
+    requestedModel: modelName,
+    servedModel: response?.modelVersion,
+  });
+
+  evaluationText = response.text();
 } catch (err) {
+  if (err instanceof DegradedEvaluationError) {
+    console.error('❌  Degraded Gemini evaluation:', err.message);
+    console.error('    No report was saved. This is NOT a valid score — retry, or use the Claude pipeline.');
+    process.exit(1);
+  }
   const sanitizedMsg = (err.message || '').split(apiKey).join('[REDACTED]');
   console.error('❌  Gemini API error:', sanitizedMsg);
-  if (sanitizedMsg.includes('API_KEY')) {
+  const kind = classifyGeminiError(sanitizedMsg);
+  if (kind === 'auth') {
     console.error('    Check your GEMINI_API_KEY in .env');
-  } else if (sanitizedMsg.includes('quota') || sanitizedMsg.includes('rate')) {
+  } else if (kind === 'quota') {
     console.error('    You may have hit the free-tier rate limit. Wait 60s and retry.');
+  } else {
+    console.error('    Transient service error (e.g. 503 high demand). Wait and retry; do NOT trust a partial result.');
   }
   process.exit(1);
 }
