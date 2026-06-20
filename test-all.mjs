@@ -686,18 +686,7 @@ for (const skillPath of ['.claude/skills/career-ops/SKILL.md', '.agents/skills/c
   }
 }
 
-const applyMode = readFile('modes/apply.md');
-if (
-  applyMode.includes('## Step 5 — Preflight gate') &&
-  applyMode.includes('verify liveness with Playwright') &&
-  applyMode.includes('matching report has been loaded') &&
-  applyMode.includes('Do not continue to Step 6 until this preflight is resolved') &&
-  applyMode.includes('refuse to generate final copy')
-) {
-  pass('apply mode includes liveness and role-match preflight gate');
-} else {
-  fail('apply mode missing liveness/role-match preflight gate');
-}
+// NOTE (fork): apply mode removed by MVP slices 01-02 — preflight-gate test dropped.
 
 const ofertaMode = readFile('modes/oferta.md');
 const autoPipelineMode = readFile('modes/auto-pipeline.md');
