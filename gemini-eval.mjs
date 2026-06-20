@@ -14,8 +14,17 @@
  * Requires:
  *   GEMINI_API_KEY in .env (or environment variable)
  *
- * Free-tier model: gemini-3.5-flash — the CURRENT default (generous quota,
- * no billing required). It is NOT deprecated.
+ * Default model: gemini-2.5-pro — the paid Pro tier (confirmed accessible via
+ * models.list + a live generateContent probe on 2026-06-21; HTTP 200,
+ * finishReason STOP, modelVersion gemini-2.5-pro). It is the newest GA/stable
+ * pro model; the gemini-3.x pros are preview-only and unfit as a default.
+ *
+ * NO automatic fallback to a weaker model. On error the evaluator fails loud
+ * and retries on the SAME model (bounded). This is deliberate: the F-01
+ * assertHealthyGeneration guard THROWS on a model-family downgrade, so a
+ * silent flash substitute would be rejected anyway and, worse, a flash
+ * "success" would falsely read as Pro being live. gemini-3.5-flash (the former
+ * free-tier default) remains reachable ONLY via an explicit `--model` override.
  *
  * Model deprecation reference (per Google AI for Developers, May 2026):
  *   - gemini-2.0-flash       deprecated 2026-03-31  (do not use)
@@ -78,7 +87,7 @@ const args = process.argv.slice(2);
 if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
   console.log(`
 ╔══════════════════════════════════════════════════════════════════╗
-║           career-ops — Gemini Evaluator (free-tier)             ║
+║           career-ops — Gemini Evaluator (Pro tier)              ║
 ╚══════════════════════════════════════════════════════════════════╝
 
   Evaluate a job offer using Google Gemini instead of Claude.
@@ -86,16 +95,20 @@ if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
   USAGE
     node gemini-eval.mjs "<JD text>"
     node gemini-eval.mjs --file ./jds/my-job.txt
-    node gemini-eval.mjs --model gemini-3.5-flash "<JD text>"
+    node gemini-eval.mjs --model gemini-3.5-flash "<JD text>"   # explicit override
 
   OPTIONS
     --file <path>    Read JD from a file instead of inline text
-    --model <name>   Gemini model to use (default: gemini-3.5-flash)
+    --model <name>   Gemini model to use (default: gemini-2.5-pro). There is NO
+                     automatic fallback — on error the same model is retried
+                     (bounded), then it fails loud. Pass --model explicitly to
+                     use a different model (e.g. gemini-3.5-flash).
     --no-save        Do not save report to reports/ directory
     --help           Show this help
 
   SETUP
-    1. Get a free API key at https://aistudio.google.com/apikey
+    1. Get an API key at https://aistudio.google.com/apikey (Pro tier requires
+       a billing-enabled project for gemini-2.5-pro)
     2. Add GEMINI_API_KEY=<your-key> to .env
     3. Run: npm install   (installs @google/generative-ai + dotenv)
 
@@ -108,7 +121,7 @@ if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
 
 // Parse flags
 let jdText = '';
-let modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+let modelName = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
 let saveReport = true;
 
 for (let i = 0; i < args.length; i++) {
@@ -284,43 +297,75 @@ const model = genAI.getGenerativeModel({
   model: modelName,
   generationConfig: {
     temperature: 0.4,      // deterministic enough for structured evaluation
-    maxOutputTokens: 16384, // full A-H evaluation
+    // gemini-2.5-pro is a "thinking" model: thought tokens count against this
+    // budget on top of the visible A-H report. Give generous headroom so a full
+    // evaluation completes with finishReason STOP rather than MAX_TOKENS (which
+    // assertHealthyGeneration would correctly reject as degraded).
+    maxOutputTokens: 32768,
   },
 });
 
+// Bounded retry on the SAME model. NO automatic fallback to a weaker model:
+// the F-01 assertHealthyGeneration guard throws on a model-family downgrade, so
+// a silent flash substitute would be rejected anyway — and a flash "success"
+// would falsely read as Pro being live. Transient errors (503/quota) and
+// degraded generations (truncation / served-model mismatch) are retried in
+// place; auth errors fail immediately; exhausting all attempts fails loud.
+const MAX_ATTEMPTS = 3;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 let evaluationText;
-try {
-  const result = await model.generateContent([
-    { text: systemPrompt },
-    { text: `\n\nJOB DESCRIPTION TO EVALUATE:\n\n${jdText}` },
-  ]);
+let lastError;
+for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  try {
+    const result = await model.generateContent([
+      { text: systemPrompt },
+      { text: `\n\nJOB DESCRIPTION TO EVALUATE:\n\n${jdText}` },
+    ]);
 
-  // F-01 guard: fail loud BEFORE reading text if the generation was truncated
-  // or served by a downgraded model. response.modelVersion is best-effort (the
-  // API may omit it); finishReason is the reliable truncation signal.
-  const response = result.response;
-  assertHealthyGeneration({
-    finishReason: response?.candidates?.[0]?.finishReason,
-    requestedModel: modelName,
-    servedModel: response?.modelVersion,
-  });
+    // F-01 guard: fail loud BEFORE reading text if the generation was truncated
+    // or served by a downgraded model. response.modelVersion is best-effort (the
+    // API may omit it); finishReason is the reliable truncation signal.
+    const response = result.response;
+    assertHealthyGeneration({
+      finishReason: response?.candidates?.[0]?.finishReason,
+      requestedModel: modelName,
+      servedModel: response?.modelVersion,
+    });
 
-  evaluationText = response.text();
-} catch (err) {
-  if (err instanceof DegradedEvaluationError) {
-    console.error('❌  Degraded Gemini evaluation:', err.message);
-    console.error('    No report was saved. This is NOT a valid score — retry, or use the Claude pipeline.');
-    process.exit(1);
+    evaluationText = response.text();
+    break; // success
+  } catch (err) {
+    lastError = err;
+
+    // Auth errors never succeed on retry — fail immediately.
+    const sanitizedMsg = (err.message || '').split(apiKey).join('[REDACTED]');
+    if (!(err instanceof DegradedEvaluationError) && classifyGeminiError(sanitizedMsg) === 'auth') {
+      console.error('❌  Gemini API error:', sanitizedMsg);
+      console.error('    Check your GEMINI_API_KEY in .env');
+      process.exit(1);
+    }
+
+    const reason = err instanceof DegradedEvaluationError
+      ? `degraded generation (${err.message})`
+      : `${classifyGeminiError(sanitizedMsg)} error (${sanitizedMsg})`;
+    console.error(`⚠️   Attempt ${attempt}/${MAX_ATTEMPTS} on ${modelName} failed: ${reason}`);
+
+    if (attempt < MAX_ATTEMPTS) {
+      const backoffMs = 2000 * attempt; // bounded linear backoff: 2s, 4s
+      console.error(`    Retrying the SAME model in ${backoffMs / 1000}s (no automatic fallback)...`);
+      await sleep(backoffMs);
+    }
   }
-  const sanitizedMsg = (err.message || '').split(apiKey).join('[REDACTED]');
-  console.error('❌  Gemini API error:', sanitizedMsg);
-  const kind = classifyGeminiError(sanitizedMsg);
-  if (kind === 'auth') {
-    console.error('    Check your GEMINI_API_KEY in .env');
-  } else if (kind === 'quota') {
-    console.error('    You may have hit the free-tier rate limit. Wait 60s and retry.');
-  } else {
-    console.error('    Transient service error (e.g. 503 high demand). Wait and retry; do NOT trust a partial result.');
+}
+
+if (evaluationText === undefined) {
+  console.error(`❌  Gemini (${modelName}) failed after ${MAX_ATTEMPTS} attempts on the SAME model.`);
+  console.error('    No report was saved and NO fallback model was used. To try a different model,');
+  console.error('    re-run with an explicit --model (e.g. --model gemini-3.5-flash), or use the Claude pipeline.');
+  if (lastError) {
+    const finalMsg = (lastError.message || '').split(apiKey).join('[REDACTED]');
+    console.error(`    Last error: ${finalMsg}`);
   }
   process.exit(1);
 }
